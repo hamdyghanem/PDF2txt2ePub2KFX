@@ -1,5 +1,6 @@
+using System.Drawing;
+using System.Drawing.Imaging;
 using System.IO;
-using System.Windows.Media.Imaging;
 using Windows.Data.Pdf;
 using Windows.Storage;
 
@@ -26,7 +27,7 @@ public class PdfRenderService : IPdfRenderService
         }
     }
 
-    public async Task<(BitmapSource PreviewImage, byte[] HighResBytes)> RenderPageAsync(
+    public async Task<(object? PreviewImage, byte[] HighResBytes)> RenderPageAsync(
         string pdfPath,
         uint pageIndex,
         double dpi = 300,
@@ -49,7 +50,7 @@ public class PdfRenderService : IPdfRenderService
 
         using var page = pdfDoc.GetPage(pageIndex);
 
-        // Standard PDF base DPI is 72. Calculate pixel dimensions for target DPI (e.g. 300 DPI for OCR).
+        // PDF base DPI is 72. Calculate pixel dimensions for target DPI (e.g. 300 DPI for OCR).
         uint targetWidth = (uint)Math.Max(100, page.Size.Width * (dpi / 72.0));
         uint targetHeight = (uint)Math.Max(100, page.Size.Height * (dpi / 72.0));
 
@@ -71,27 +72,23 @@ public class PdfRenderService : IPdfRenderService
             reader.ReadBytes(rawBytes);
         }
 
-        // Create WPF BitmapSource
-        var bitmap = new BitmapImage();
-        using (var ms = new MemoryStream(rawBytes))
+        // Convert raw PNG bytes to Bitmap for UI preview
+        Bitmap? previewBitmap = null;
+        try
         {
-            bitmap.BeginInit();
-            bitmap.CacheOption = BitmapCacheOption.OnLoad;
-            bitmap.StreamSource = ms;
-            bitmap.EndInit();
-            bitmap.Freeze(); // Makes it thread-safe for WPF UI
+            using var ms = new MemoryStream(rawBytes);
+            previewBitmap = new Bitmap(ms);
+        }
+        catch
+        {
+            // If conversion fails, preview is null
         }
 
-        // Encode BitmapSource to clean PNG byte array for Tesseract Pix decoder
-        byte[] pngBytes;
-        using (var ms = new MemoryStream())
-        {
-            var encoder = new PngBitmapEncoder();
-            encoder.Frames.Add(BitmapFrame.Create(bitmap));
-            encoder.Save(ms);
-            pngBytes = ms.ToArray();
-        }
+        // re-encode as PNG for Tesseract OCR
+        byte[] pngBytes = rawBytes; // rawBytes are already PNG from PDF rendering
 
-        return (bitmap, pngBytes);
+        // Return bitmap as object for WinForms preview, PNG bytes for OCR
+        return ((object?)previewBitmap, pngBytes);
     }
 }
+

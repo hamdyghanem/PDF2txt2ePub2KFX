@@ -1,70 +1,176 @@
 using System.Collections.ObjectModel;
+using System.Drawing;
 using System.IO;
-using System.Windows;
 using ArabicPdfOcrApp.Models;
 using ArabicPdfOcrApp.Services;
-using CommunityToolkit.Mvvm.ComponentModel;
-using CommunityToolkit.Mvvm.Input;
 using Microsoft.Win32;
-using ModernWpf;
 
 namespace ArabicPdfOcrApp.ViewModels;
 
-public partial class MainViewModel : ObservableObject
+public class MainViewModel
 {
     private readonly IPdfRenderService _pdfRenderService;
     private readonly ITextExportService _textExportService;
     private CancellationTokenSource? _cts;
 
-    [ObservableProperty]
     private string _pdfFilePath = string.Empty;
-
-    [ObservableProperty]
     private string _outputFilePath = string.Empty;
-
-    [ObservableProperty]
     private ObservableCollection<PdfPageItem> _pages = new();
-
-    [ObservableProperty]
     private PdfPageItem? _selectedPage;
-
-    [ObservableProperty]
     private int _selectedPageIndex;
-
-    [ObservableProperty]
     private int _totalPages;
-
-    [ObservableProperty]
     private string _extractedText = string.Empty;
-
-    [ObservableProperty]
     private bool _isProcessing;
-
-    [ObservableProperty]
     private double _progressPercentage;
-
-    [ObservableProperty]
     private string _statusMessage = "Ready. Please load a PDF file to begin.";
-
-    [ObservableProperty]
     private bool _isIndeterminateProgress;
-
-    [ObservableProperty]
     private OcrEngineType _selectedOcrEngine = OcrEngineType.TesseractArabic;
-
-    [ObservableProperty]
     private bool _isDarkMode = true;
-
-    [ObservableProperty]
     private int _totalWordCount;
-
-    [ObservableProperty]
     private int _totalCharCount;
-
-    [ObservableProperty]
     private bool _hasLoadedPdf;
+    private ConversionWorkflow? _currentWorkflow;
+    private ConversionMode _selectedMode = ConversionMode.Pdf;
+
+    public ConversionWorkflow? CurrentWorkflow
+    {
+        get => _currentWorkflow;
+        set => _currentWorkflow = value;
+    }
+
+    public ConversionMode SelectedMode
+    {
+        get => _selectedMode;
+        set => _selectedMode = value;
+    }
+
+    public string PdfFilePath
+    {
+        get => _pdfFilePath;
+        set
+        {
+            if (_pdfFilePath != value)
+            {
+                _pdfFilePath = value;
+                OnPdfFilePathChanged(value);
+            }
+        }
+    }
+
+    public string OutputFilePath
+    {
+        get => _outputFilePath;
+        set => _outputFilePath = value;
+    }
+
+    public ObservableCollection<PdfPageItem> Pages
+    {
+        get => _pages;
+        set => _pages = value;
+    }
+
+    public PdfPageItem? SelectedPage
+    {
+        get => _selectedPage;
+        set
+        {
+            if (_selectedPage != value)
+            {
+                _selectedPage = value;
+                OnSelectedPageChanged(value);
+            }
+        }
+    }
+
+    public int SelectedPageIndex
+    {
+        get => _selectedPageIndex;
+        set => _selectedPageIndex = value;
+    }
+
+    public int TotalPages
+    {
+        get => _totalPages;
+        set => _totalPages = value;
+    }
+
+    public string ExtractedText
+    {
+        get => _extractedText;
+        set
+        {
+            if (_extractedText != value)
+            {
+                _extractedText = value;
+                OnExtractedTextChanged(value);
+            }
+        }
+    }
+
+    public bool IsProcessing
+    {
+        get => _isProcessing;
+        set => _isProcessing = value;
+    }
+
+    public double ProgressPercentage
+    {
+        get => _progressPercentage;
+        set => _progressPercentage = value;
+    }
+
+    public string StatusMessage
+    {
+        get => _statusMessage;
+        set => _statusMessage = value;
+    }
+
+    public bool IsIndeterminateProgress
+    {
+        get => _isIndeterminateProgress;
+        set => _isIndeterminateProgress = value;
+    }
+
+    public OcrEngineType SelectedOcrEngine
+    {
+        get => _selectedOcrEngine;
+        set => _selectedOcrEngine = value;
+    }
+
+    public bool IsDarkMode
+    {
+        get => _isDarkMode;
+        set => _isDarkMode = value;
+    }
+
+    public int TotalWordCount
+    {
+        get => _totalWordCount;
+        set => _totalWordCount = value;
+    }
+
+    public int TotalCharCount
+    {
+        get => _totalCharCount;
+        set => _totalCharCount = value;
+    }
+
+    public bool HasLoadedPdf
+    {
+        get => _hasLoadedPdf;
+        set => _hasLoadedPdf = value;
+    }
 
     public Array AvailableEngines => Enum.GetValues(typeof(OcrEngineType));
+
+    public IRelayCommand OpenFileCommand { get; }
+    public IRelayCommand BrowseOutputPathCommand { get; }
+    public IRelayCommand StartOcrCommand { get; }
+    public IRelayCommand CancelOcrCommand { get; }
+    public IRelayCommand CopyToClipboardCommand { get; }
+    public IRelayCommand SaveTextCommand { get; }
+    public IRelayCommand SaveAsEpubCommand { get; }
+    public IRelayCommand SaveAsKfxCommand { get; }
 
     public MainViewModel() : this(new PdfRenderService(), new TextExportService())
     {
@@ -74,21 +180,41 @@ public partial class MainViewModel : ObservableObject
     {
         _pdfRenderService = pdfRenderService;
         _textExportService = textExportService;
-        
-        // Initial dark theme
-        ThemeManager.Current.ApplicationTheme = ApplicationTheme.Dark;
+
+        // Initialize relay commands
+        OpenFileCommand = new RelayCommand(OpenFile);
+        BrowseOutputPathCommand = new RelayCommand(BrowseOutputPath);
+        StartOcrCommand = new RelayCommand(async () => await StartOcrAsync());
+        CancelOcrCommand = new RelayCommand(CancelOcr);
+        CopyToClipboardCommand = new RelayCommand(CopyToClipboard);
+        SaveTextCommand = new RelayCommand(async () => await SaveTextAsync());
+        SaveAsEpubCommand = new RelayCommand(async () => await SaveAsEpubAsync());
+        SaveAsKfxCommand = new RelayCommand(async () => await SaveAsKfxAsync());
     }
 
-    partial void OnPdfFilePathChanged(string value)
+    private void OnPdfFilePathChanged(string value)
     {
         if (!string.IsNullOrWhiteSpace(value) && File.Exists(value))
         {
-            OutputFilePath = Path.ChangeExtension(value, ".txt");
-            _ = LoadPdfDocumentAsync(value);
+            string ext = Path.GetExtension(value).ToLowerInvariant();
+            if (ext == ".pdf")
+            {
+                OutputFilePath = Path.ChangeExtension(value, ".txt");
+            }
+            else if (ext == ".txt")
+            {
+                OutputFilePath = value;
+            }
+            else if (ext == ".epub")
+            {
+                OutputFilePath = Path.ChangeExtension(value, ".txt");
+            }
+
+            _ = LoadDocumentAsync(value);
         }
     }
 
-    partial void OnSelectedPageChanged(PdfPageItem? value)
+    private void OnSelectedPageChanged(PdfPageItem? value)
     {
         if (value != null)
         {
@@ -96,7 +222,7 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    partial void OnExtractedTextChanged(string value)
+    private void OnExtractedTextChanged(string value)
     {
         TotalCharCount = value?.Length ?? 0;
         if (string.IsNullOrWhiteSpace(value))
@@ -106,6 +232,67 @@ public partial class MainViewModel : ObservableObject
         else
         {
             TotalWordCount = value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
+        }
+    }
+
+    public async Task LoadDocumentAsync(string path)
+    {
+        if (!File.Exists(path)) return;
+
+        string ext = Path.GetExtension(path).ToLowerInvariant();
+        if (ext == ".pdf")
+        {
+            await LoadPdfDocumentAsync(path);
+        }
+        else if (ext == ".txt")
+        {
+            try
+            {
+                IsProcessing = true;
+                IsIndeterminateProgress = true;
+                StatusMessage = $"Loading text file '{Path.GetFileName(path)}'...";
+                Pages.Clear();
+                HasLoadedPdf = false;
+                TotalPages = 0;
+
+                ExtractedText = await File.ReadAllTextAsync(path, System.Text.Encoding.UTF8);
+                StatusMessage = $"Successfully loaded text file '{Path.GetFileName(path)}' ({TotalWordCount} words). Ready to export to EPUB or KFX!";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Error loading text file: {ex.Message}";
+                MessageBox.Show($"Failed to load text file:\n{ex.Message}", "Text File Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                IsProcessing = false;
+                IsIndeterminateProgress = false;
+            }
+        }
+        else if (ext == ".epub")
+        {
+            try
+            {
+                IsProcessing = true;
+                IsIndeterminateProgress = true;
+                StatusMessage = $"Extracting text from EPUB file '{Path.GetFileName(path)}'...";
+                Pages.Clear();
+                HasLoadedPdf = false;
+                TotalPages = 0;
+
+                ExtractedText = await EpubExportService.ReadEpubTextAsync(path);
+                StatusMessage = $"Successfully loaded EPUB file '{Path.GetFileName(path)}' ({TotalWordCount} words). Ready to export to KFX!";
+            }
+            catch (Exception ex)
+            {
+                StatusMessage = $"Error reading EPUB file: {ex.Message}";
+                MessageBox.Show($"Failed to load EPUB file:\n{ex.Message}", "EPUB Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+            }
+            finally
+            {
+                IsProcessing = false;
+                IsIndeterminateProgress = false;
+            }
         }
     }
 
@@ -128,10 +315,25 @@ public partial class MainViewModel : ObservableObject
             {
                 var (previewImage, highResBytes) = await _pdfRenderService.RenderPageAsync(path, i, dpi: 150);
 
+                // Convert bytes to Bitmap for WinForms preview
+                Bitmap? bitmap = null;
+                if (highResBytes != null && highResBytes.Length > 0)
+                {
+                    try
+                    {
+                        using var ms = new MemoryStream(highResBytes);
+                        bitmap = new Bitmap(ms);
+                    }
+                    catch
+                    {
+                        // If conversion fails, bitmap remains null
+                    }
+                }
+
                 var pageItem = new PdfPageItem
                 {
                     PageIndex = (int)i + 1,
-                    PageImage = previewImage,
+                    PageImage = bitmap,
                     HighResImageBytes = highResBytes,
                     Status = OcrStatus.Pending
                 };
@@ -152,7 +354,7 @@ public partial class MainViewModel : ObservableObject
         catch (Exception ex)
         {
             StatusMessage = $"Error loading PDF: {ex.Message}";
-            MessageBox.Show($"Failed to load PDF file:\n{ex.Message}", "PDF Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"Failed to load PDF file:\n{ex.Message}", "PDF Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
         {
@@ -162,22 +364,20 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
     private void OpenFile()
     {
         var openFileDialog = new OpenFileDialog
         {
-            Filter = "PDF Files (*.pdf)|*.pdf|All Files (*.*)|*.*",
-            Title = "Select Arabic PDF Document"
+            Filter = "Supported Files (*.pdf;*.txt;*.epub)|*.pdf;*.txt;*.epub|PDF Files (*.pdf)|*.pdf|Text Files (*.txt)|*.txt|EPUB Files (*.epub)|*.epub|All Files (*.*)|*.*",
+            Title = "Select Document (PDF, TXT, or EPUB)"
         };
 
-        if (openFileDialog.ShowDialog() == true)
+        if (openFileDialog.ShowDialog() == DialogResult.OK)
         {
             PdfFilePath = openFileDialog.FileName;
         }
     }
 
-    [RelayCommand]
     private void BrowseOutputPath()
     {
         var saveFileDialog = new SaveFileDialog
@@ -196,18 +396,17 @@ public partial class MainViewModel : ObservableObject
             }
         }
 
-        if (saveFileDialog.ShowDialog() == true)
+        if (saveFileDialog.ShowDialog() == DialogResult.OK)
         {
             OutputFilePath = saveFileDialog.FileName;
         }
     }
 
-    [RelayCommand]
     private async Task StartOcrAsync()
     {
         if (string.IsNullOrWhiteSpace(PdfFilePath) || !File.Exists(PdfFilePath))
         {
-            MessageBox.Show("Please select a valid PDF file first.", "No PDF File", MessageBoxButton.OK, MessageBoxImage.Warning);
+            MessageBox.Show("Please select a valid PDF file first.", "No PDF File", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -243,7 +442,7 @@ public partial class MainViewModel : ObservableObject
                 var page = Pages[i];
                 SelectedPage = page;
                 page.Status = OcrStatus.Processing;
-                
+
                 int currentPageNumber = i + 1;
                 StatusMessage = $"Processing page {currentPageNumber} of {Pages.Count} using {ocrService.EngineName}...";
                 ProgressPercentage = ((double)i / Pages.Count) * 100;
@@ -294,12 +493,12 @@ public partial class MainViewModel : ObservableObject
         catch (OperationCanceledException)
         {
             StatusMessage = "OCR operation was cancelled by the user.";
-            MessageBox.Show("OCR processing was cancelled.", "Operation Cancelled", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("OCR processing was cancelled.", "Operation Cancelled", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
             StatusMessage = $"OCR Error: {ex.Message}";
-            MessageBox.Show($"An error occurred during OCR processing:\n{ex.Message}", "OCR Failed", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"An error occurred during OCR processing:\n{ex.Message}", "OCR Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
         {
@@ -310,7 +509,6 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
     private void CancelOcr()
     {
         if (_cts != null && !_cts.IsCancellationRequested)
@@ -320,32 +518,61 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
     private void CopyToClipboard()
     {
         if (string.IsNullOrWhiteSpace(ExtractedText))
         {
-            MessageBox.Show("There is no extracted text to copy.", "Empty Text", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show("There is no extracted text to copy.", "Empty Text", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
 
         try
         {
-            Clipboard.SetText(ExtractedText);
+            System.Windows.Forms.Clipboard.SetText(ExtractedText);
             StatusMessage = "Extracted Arabic text copied to clipboard.";
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Failed to copy to clipboard: {ex.Message}", "Clipboard Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"Failed to copy to clipboard: {ex.Message}", "Clipboard Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
 
-    [RelayCommand]
+    private async Task<bool> EnsureTextLoadedAsync()
+    {
+        if (!string.IsNullOrWhiteSpace(ExtractedText))
+        {
+            return true;
+        }
+
+        if (!string.IsNullOrWhiteSpace(PdfFilePath) && File.Exists(PdfFilePath))
+        {
+            await LoadDocumentAsync(PdfFilePath);
+            if (!string.IsNullOrWhiteSpace(ExtractedText))
+            {
+                return true;
+            }
+        }
+
+        var openDlg = new OpenFileDialog
+        {
+            Filter = "Supported Files (*.pdf;*.txt;*.epub)|*.pdf;*.txt;*.epub|Text Files (*.txt)|*.txt|EPUB Files (*.epub)|*.epub|PDF Files (*.pdf)|*.pdf|All Files (*.*)|*.*",
+            Title = "Select File to Open & Export"
+        };
+
+        if (openDlg.ShowDialog() == DialogResult.OK)
+        {
+            PdfFilePath = openDlg.FileName;
+            await LoadDocumentAsync(openDlg.FileName);
+            return !string.IsNullOrWhiteSpace(ExtractedText);
+        }
+
+        return false;
+    }
+
     private async Task SaveTextAsync()
     {
-        if (string.IsNullOrWhiteSpace(ExtractedText))
+        if (!await EnsureTextLoadedAsync())
         {
-            MessageBox.Show("There is no extracted text to save.", "Empty Text", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -360,21 +587,19 @@ public partial class MainViewModel : ObservableObject
             {
                 await _textExportService.SaveTextAsync(OutputFilePath, ExtractedText);
                 StatusMessage = $"Text successfully saved to '{OutputFilePath}'.";
-                MessageBox.Show($"Text saved successfully to:\n{OutputFilePath}", "Save Successful", MessageBoxButton.OK, MessageBoxImage.Information);
+                MessageBox.Show($"Text saved successfully to:\n{OutputFilePath}", "Save Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
-                MessageBox.Show($"Failed to save text file:\n{ex.Message}", "Save Error", MessageBoxButton.OK, MessageBoxImage.Error);
+                MessageBox.Show($"Failed to save text file:\n{ex.Message}", "Save Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
     }
 
-    [RelayCommand]
     private async Task SaveAsEpubAsync()
     {
-        if (string.IsNullOrWhiteSpace(ExtractedText))
+        if (!await EnsureTextLoadedAsync())
         {
-            MessageBox.Show("There is no extracted text to export.\nPlease run OCR extraction first.", "No Text", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -390,11 +615,11 @@ public partial class MainViewModel : ObservableObject
             InitialDirectory = Path.GetDirectoryName(suggestedName) ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
         };
 
-        if (dlg.ShowDialog() != true) return;
+        if (dlg.ShowDialog() != DialogResult.OK) return;
 
         string epubPath = dlg.FileName;
         string bookTitle = string.IsNullOrWhiteSpace(PdfFilePath)
-            ? "Extracted Arabic Text"
+            ? "Extracted Text"
             : Path.GetFileNameWithoutExtension(PdfFilePath);
 
         try
@@ -407,11 +632,11 @@ public partial class MainViewModel : ObservableObject
             await svc.SaveEpubAsync(epubPath, ExtractedText, bookTitle);
 
             StatusMessage = $"EPUB saved to '{Path.GetFileName(epubPath)}'.";
-            MessageBox.Show($"EPUB file created successfully:\n{epubPath}", "EPUB Saved", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show($"EPUB file created successfully:\n{epubPath}", "EPUB Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Failed to create EPUB:\n{ex.Message}", "EPUB Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"Failed to create EPUB:\n{ex.Message}", "EPUB Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
         finally
         {
@@ -420,12 +645,10 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
     private async Task SaveAsKfxAsync()
     {
-        if (string.IsNullOrWhiteSpace(ExtractedText))
+        if (!await EnsureTextLoadedAsync())
         {
-            MessageBox.Show("There is no extracted text to export.\nPlease run OCR extraction first.", "No Text", MessageBoxButton.OK, MessageBoxImage.Warning);
             return;
         }
 
@@ -438,7 +661,7 @@ public partial class MainViewModel : ObservableObject
                 "Please install Calibre from https://calibre-ebook.com/\n" +
                 "Then install the 'KFX Output' plugin inside Calibre:\n" +
                 "  Preferences → Plugins → Get new plugins → search 'KFX Output'",
-                "Calibre Not Found", MessageBoxButton.OK, MessageBoxImage.Warning);
+                "Calibre Not Found", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
 
@@ -454,11 +677,11 @@ public partial class MainViewModel : ObservableObject
             InitialDirectory = Path.GetDirectoryName(suggestedName) ?? Environment.GetFolderPath(Environment.SpecialFolder.Desktop)
         };
 
-        if (dlg.ShowDialog() != true) return;
+        if (dlg.ShowDialog() != DialogResult.OK) return;
 
         string kfxPath = dlg.FileName;
         string bookTitle = string.IsNullOrWhiteSpace(PdfFilePath)
-            ? "Extracted Arabic Text"
+            ? "Extracted Text"
             : Path.GetFileNameWithoutExtension(PdfFilePath);
 
         try
@@ -472,11 +695,11 @@ public partial class MainViewModel : ObservableObject
             await svc.SaveKfxAsync(kfxPath, ExtractedText, bookTitle, calibreExe, progress);
 
             StatusMessage = $"KFX saved to '{Path.GetFileName(kfxPath)}'.";
-            MessageBox.Show($"KFX file created successfully:\n{kfxPath}", "KFX Saved", MessageBoxButton.OK, MessageBoxImage.Information);
+            MessageBox.Show($"KFX file created successfully:\n{kfxPath}", "KFX Saved", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
-            MessageBox.Show($"Failed to create KFX:\n{ex.Message}", "KFX Error", MessageBoxButton.OK, MessageBoxImage.Error);
+            MessageBox.Show($"Failed to create KFX:\n{ex.Message}", "KFX Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             StatusMessage = "KFX export failed.";
         }
         finally
@@ -486,48 +709,216 @@ public partial class MainViewModel : ObservableObject
         }
     }
 
-    [RelayCommand]
-    private void ToggleTheme()
-    {
-        IsDarkMode = !IsDarkMode;
-        ThemeManager.Current.ApplicationTheme = IsDarkMode ? ApplicationTheme.Dark : ApplicationTheme.Light;
-    }
-
-    [RelayCommand]
-    private void SelectPreviousPage()
-    {
-        if (Pages.Count > 0 && SelectedPage != null)
-        {
-            int index = Pages.IndexOf(SelectedPage);
-            if (index > 0)
-            {
-                SelectedPage = Pages[index - 1];
-            }
-        }
-    }
-
-    [RelayCommand]
-    private void SelectNextPage()
-    {
-        if (Pages.Count > 0 && SelectedPage != null)
-        {
-            int index = Pages.IndexOf(SelectedPage);
-            if (index < Pages.Count - 1)
-            {
-                SelectedPage = Pages[index + 1];
-            }
-        }
-    }
-
     public async Task HandleDroppedFileAsync(string filePath)
     {
-        if (File.Exists(filePath) && Path.GetExtension(filePath).Equals(".pdf", StringComparison.OrdinalIgnoreCase))
+        if (File.Exists(filePath))
         {
-            PdfFilePath = filePath;
+            string ext = Path.GetExtension(filePath).ToLowerInvariant();
+            if (ext == ".pdf" || ext == ".txt" || ext == ".epub")
+            {
+                PdfFilePath = filePath;
+                return;
+            }
         }
-        else
-        {
-            MessageBox.Show("Please drop a valid .pdf file.", "Invalid File", MessageBoxButton.OK, MessageBoxImage.Warning);
-        }
+
+        MessageBox.Show("Please drop a valid .pdf, .txt, or .epub file.", "Invalid File", MessageBoxButtons.OK, MessageBoxIcon.Warning);
     }
+
+    /// <summary>
+    /// Initialize a conversion workflow based on selected mode
+    /// </summary>
+    public ConversionWorkflow InitializeWorkflow(ConversionMode mode, string baseFileName, string outputDirectory)
+    {
+        var workflow = new ConversionWorkflow
+        {
+            StartingMode = mode,
+            BaseFileName = baseFileName,
+            OutputDirectory = outputDirectory,
+            Steps = new()
+        };
+
+        // Build the conversion chain based on mode
+        int order = 0;
+        switch (mode)
+        {
+            case ConversionMode.Pdf:
+                workflow.Steps.Add(new ConversionStep
+                {
+                    Format = "PDF",
+                    DisplayName = "PDF (Source)",
+                    FileExtension = "pdf",
+                    Order = order++,
+                    IsCompleted = false
+                });
+                workflow.Steps.Add(new ConversionStep
+                {
+                    Format = "TXT",
+                    DisplayName = "TXT (After OCR)",
+                    FileExtension = "txt",
+                    Order = order++,
+                    IsCompleted = false
+                });
+                break;
+
+            case ConversionMode.Txt:
+                workflow.Steps.Add(new ConversionStep
+                {
+                    Format = "TXT",
+                    DisplayName = "TXT (Source)",
+                    FileExtension = "txt",
+                    Order = order++,
+                    IsCompleted = false
+                });
+                break;
+
+            case ConversionMode.Epub:
+                workflow.Steps.Add(new ConversionStep
+                {
+                    Format = "EPUB",
+                    DisplayName = "EPUB (Source)",
+                    FileExtension = "epub",
+                    Order = order++,
+                    IsCompleted = false
+                });
+                break;
+        }
+
+        CurrentWorkflow = workflow;
+        return workflow;
+    }
+
+    /// <summary>
+    /// Add EPUB export step to the workflow
+    /// </summary>
+    public void AddEpubStep()
+    {
+        if (CurrentWorkflow == null) return;
+
+        int nextOrder = CurrentWorkflow.Steps.Count;
+        CurrentWorkflow.Steps.Add(new ConversionStep
+        {
+            Format = "EPUB",
+            DisplayName = "EPUB (eBook Format)",
+            FileExtension = "epub",
+            Order = nextOrder,
+            IsCompleted = false
+        });
+    }
+
+    /// <summary>
+    /// Add KFX export step to the workflow
+    /// </summary>
+    public void AddKfxStep()
+    {
+        if (CurrentWorkflow == null) return;
+
+        int nextOrder = CurrentWorkflow.Steps.Count;
+        CurrentWorkflow.Steps.Add(new ConversionStep
+        {
+            Format = "KFX",
+            DisplayName = "KFX (Kindle Format)",
+            FileExtension = "kfx",
+            Order = nextOrder,
+            IsCompleted = false
+        });
+    }
+
+    /// <summary>
+    /// Get the full file path for a specific conversion step
+    /// </summary>
+    public string GetStepFilePath(ConversionStep step)
+    {
+        if (CurrentWorkflow == null) return string.Empty;
+
+        return Path.Combine(CurrentWorkflow.OutputDirectory, 
+            $"{CurrentWorkflow.BaseFileName}.{step.FileExtension}");
+    }
+
+    /// <summary>
+    /// Mark current step as completed and move to next step
+    /// </summary>
+    public bool MoveToNextStep()
+    {
+        if (CurrentWorkflow == null) return false;
+
+        var currentStep = CurrentWorkflow.GetCurrentStep();
+        if (currentStep != null)
+        {
+            currentStep.IsCompleted = true;
+            currentStep.FilePath = GetStepFilePath(currentStep);
+        }
+
+        if (!CurrentWorkflow.IsLastStep)
+        {
+            CurrentWorkflow.CurrentStepIndex++;
+            return true;
+        }
+
+        return false; // No more steps
+    }
+
+    /// <summary>
+    /// Get the next available conversion options from current step
+    /// </summary>
+    public List<string> GetAvailableNextFormats()
+    {
+        if (CurrentWorkflow == null) return new();
+
+        var current = CurrentWorkflow.GetCurrentStep();
+        if (current == null) return new();
+
+        var options = new List<string>();
+
+        // From PDF, can only go to TXT
+        if (current.Format == "PDF")
+            options.Add("TXT");
+        // From TXT, can go to EPUB or KFX
+        else if (current.Format == "TXT")
+        {
+            options.Add("EPUB");
+            options.Add("KFX");
+        }
+        // From EPUB, can go to KFX
+        else if (current.Format == "EPUB")
+            options.Add("KFX");
+
+        return options;
+    }
+}
+
+// Simple RelayCommand implementation for WinForms
+public interface IRelayCommand
+{
+    void Execute(object? parameter);
+    bool CanExecute(object? parameter);
+}
+
+public class RelayCommand : IRelayCommand
+{
+    private readonly Action _execute;
+    private readonly Func<bool>? _canExecute;
+
+    public RelayCommand(Action execute, Func<bool>? canExecute = null)
+    {
+        _execute = execute;
+        _canExecute = canExecute;
+    }
+
+    public void Execute(object? parameter) => _execute();
+    public bool CanExecute(object? parameter) => _canExecute?.Invoke() ?? true;
+}
+
+public class RelayCommand<T> : IRelayCommand
+{
+    private readonly Action<T?> _execute;
+    private readonly Func<T?, bool>? _canExecute;
+
+    public RelayCommand(Action<T?> execute, Func<T?, bool>? canExecute = null)
+    {
+        _execute = execute;
+        _canExecute = canExecute;
+    }
+
+    public void Execute(object? parameter) => _execute((T?)parameter);
+    public bool CanExecute(object? parameter) => _canExecute?.Invoke((T?)parameter) ?? true;
 }

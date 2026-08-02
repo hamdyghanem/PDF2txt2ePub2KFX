@@ -1,44 +1,15 @@
-using System.Windows.Media.Imaging;
-using CommunityToolkit.Mvvm.ComponentModel;
+using System.Drawing;
 
 namespace ArabicPdfOcrApp.Models;
 
-public partial class PdfPageItem : ObservableObject
+public class PdfPageItem
 {
-    [ObservableProperty]
-    private int _pageIndex;
-
-    [ObservableProperty]
-    private BitmapSource? _pageImage;
-
-    [ObservableProperty]
-    private byte[]? _highResImageBytes;
-
-    [ObservableProperty]
-    private string _extractedText = string.Empty;
-
-    [ObservableProperty]
-    private OcrStatus _status = OcrStatus.Pending;
-
-    [ObservableProperty]
-    private string? _errorMessage;
-
-    [ObservableProperty]
-    private int _wordCount;
-
-    [ObservableProperty]
-    private int _charCount;
-
-    partial void OnExtractedTextChanged(string value)
-    {
-        CharCount = value?.Length ?? 0;
-        if (string.IsNullOrWhiteSpace(value))
-        {
-            WordCount = 0;
-        }
-        else
-        {
-            WordCount = value.Split((char[]?)null, StringSplitOptions.RemoveEmptyEntries).Length;
-        }
-    }
+    public int PageIndex { get; set; }
+    public Image? PageImage { get; set; }
+    public byte[]? HighResImageBytes { get; set; }
+    public string ExtractedText { get; set; } = string.Empty;
+    public OcrStatus Status { get; set; } = OcrStatus.Pending;
+    public string? ErrorMessage { get; set; }
+    public int WordCount { get; set; }
+    public int CharCount { get; set; }
 }

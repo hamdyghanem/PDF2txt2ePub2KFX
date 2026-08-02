@@ -198,4 +198,49 @@ p.centered {
         using var writer = new StreamWriter(entry.Open(), new UTF8Encoding(false));
         writer.Write(content);
     }
+
+    /// <summary>
+    /// Reads and extracts plain text from an EPUB file.
+    /// </summary>
+    public static async Task<string> ReadEpubTextAsync(string epubPath)
+    {
+        return await Task.Run(() =>
+        {
+            using var zip = ZipFile.OpenRead(epubPath);
+            var sb = new StringBuilder();
+            var htmlEntries = zip.Entries
+                .Where(e => e.FullName.EndsWith(".xhtml", StringComparison.OrdinalIgnoreCase) ||
+                            e.FullName.EndsWith(".html", StringComparison.OrdinalIgnoreCase) ||
+                            e.FullName.EndsWith(".htm", StringComparison.OrdinalIgnoreCase))
+                .Where(e => !e.FullName.Contains("toc.", StringComparison.OrdinalIgnoreCase))
+                .OrderBy(e => e.FullName);
+
+            int chapterNum = 1;
+            foreach (var entry in htmlEntries)
+            {
+                using var reader = new StreamReader(entry.Open(), Encoding.UTF8);
+                string html = reader.ReadToEnd();
+                string text = StripHtml(html);
+                if (!string.IsNullOrWhiteSpace(text))
+                {
+                    sb.AppendLine($"--- الفصل {chapterNum++} ---");
+                    sb.AppendLine(text.Trim());
+                    sb.AppendLine();
+                }
+            }
+
+            return sb.ToString().Trim();
+        });
+    }
+
+    private static string StripHtml(string html)
+    {
+        string text = Regex.Replace(html, @"(?i)<(br|/p|/div|/h[1-6]|/li)\s*/?>", "\n");
+        text = Regex.Replace(text, @"<[^>]+>", " ");
+        text = System.Net.WebUtility.HtmlDecode(text);
+        text = Regex.Replace(text, @"\r", "");
+        text = Regex.Replace(text, @"\n\s*\n\s*\n+", "\n\n");
+        return text.Trim();
+    }
 }
+
