@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 
-namespace ArabicPdfOcrApp.Services;
+namespace NileFusion.Converter.Services;
 
 public class KfxExportService
 {

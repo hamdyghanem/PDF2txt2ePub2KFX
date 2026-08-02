@@ -1,16 +1,17 @@
 using System.Collections.ObjectModel;
 using System.Drawing;
 using System.IO;
-using ArabicPdfOcrApp.Models;
-using ArabicPdfOcrApp.Services;
+using NileFusion.Converter.Models;
+using NileFusion.Converter.Services;
 using Microsoft.Win32;
 
-namespace ArabicPdfOcrApp.ViewModels;
+namespace NileFusion.Converter.ViewModels;
 
 public class MainViewModel
 {
     private readonly IPdfRenderService _pdfRenderService;
     private readonly ITextExportService _textExportService;
+    private readonly ILogService _logger;
     private CancellationTokenSource? _cts;
 
     private string _pdfFilePath = string.Empty;
@@ -172,14 +173,22 @@ public class MainViewModel
     public IRelayCommand SaveAsEpubCommand { get; }
     public IRelayCommand SaveAsKfxCommand { get; }
 
-    public MainViewModel() : this(new PdfRenderService(), new TextExportService())
+    public MainViewModel() : this(new PdfRenderService(), new TextExportService(), new FileLogService())
     {
     }
 
     public MainViewModel(IPdfRenderService pdfRenderService, ITextExportService textExportService)
+        : this(pdfRenderService, textExportService, new NullLogService())
+    {
+    }
+
+    public MainViewModel(IPdfRenderService pdfRenderService, ITextExportService textExportService, ILogService logger)
     {
         _pdfRenderService = pdfRenderService;
         _textExportService = textExportService;
+        _logger = logger ?? new NullLogService();
+
+        _logger.LogInfo("MainViewModel initialized");
 
         // Initialize relay commands
         OpenFileCommand = new RelayCommand(OpenFile);
@@ -300,6 +309,17 @@ public class MainViewModel
     {
         try
         {
+            // Validate input path
+            var (isValid, errorMsg) = ValidationService.ValidateFilePath(path, mustExist: true, ".pdf");
+            if (!isValid)
+            {
+                _logger.LogWarning($"PDF load validation failed: {errorMsg}");
+                StatusMessage = $"Invalid PDF file: {errorMsg}";
+                MessageBox.Show($"Invalid PDF file:\n{errorMsg}", "File Error", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                return;
+            }
+
+            _logger.LogInfo($"Starting PDF load: {Path.GetFileName(path)}");
             IsProcessing = true;
             IsIndeterminateProgress = true;
             StatusMessage = "Loading PDF file structure...";
@@ -308,6 +328,7 @@ public class MainViewModel
 
             int pageCount = await _pdfRenderService.GetPageCountAsync(path);
             TotalPages = pageCount;
+            _logger.LogInfo($"PDF loaded: {pageCount} pages");
 
             StatusMessage = $"Rendering page previews (0 of {pageCount})...";
 
@@ -324,8 +345,9 @@ public class MainViewModel
                         using var ms = new MemoryStream(highResBytes);
                         bitmap = new Bitmap(ms);
                     }
-                    catch
+                    catch (Exception ex)
                     {
+                        _logger.LogWarning($"Failed to convert page {i} to bitmap: {ex.Message}");
                         // If conversion fails, bitmap remains null
                     }
                 }
@@ -349,10 +371,12 @@ public class MainViewModel
                 SelectedPage = Pages[0];
             }
 
+            _logger.LogInfo($"PDF loading completed: {Pages.Count} pages rendered successfully");
             StatusMessage = $"Successfully loaded '{Path.GetFileName(path)}' ({TotalPages} pages). Ready for Arabic OCR.";
         }
         catch (Exception ex)
         {
+            _logger.LogError($"Failed to load PDF: {ex.Message}", ex);
             StatusMessage = $"Error loading PDF: {ex.Message}";
             MessageBox.Show($"Failed to load PDF file:\n{ex.Message}", "PDF Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
@@ -374,6 +398,7 @@ public class MainViewModel
 
         if (openFileDialog.ShowDialog() == DialogResult.OK)
         {
+            _logger.LogInfo($"File selected by user: {openFileDialog.FileName}");
             PdfFilePath = openFileDialog.FileName;
         }
     }
@@ -406,9 +431,12 @@ public class MainViewModel
     {
         if (string.IsNullOrWhiteSpace(PdfFilePath) || !File.Exists(PdfFilePath))
         {
+            _logger.LogWarning("OCR start failed: no valid PDF file selected");
             MessageBox.Show("Please select a valid PDF file first.", "No PDF File", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             return;
         }
+
+        _logger.LogInfo($"Starting OCR process for: {Path.GetFileName(PdfFilePath)}");
 
         if (Pages.Count == 0)
         {
@@ -481,6 +509,7 @@ public class MainViewModel
                 ProgressPercentage = ((double)currentPageNumber / Pages.Count) * 100;
             }
 
+            _logger.LogInfo($"OCR extraction completed successfully for {Pages.Count} pages");
             StatusMessage = $"OCR extraction completed successfully for {Pages.Count} pages!";
 
             // Auto-save output file if output path is set
@@ -492,11 +521,13 @@ public class MainViewModel
         }
         catch (OperationCanceledException)
         {
+            _logger.LogWarning("OCR operation was cancelled by user");
             StatusMessage = "OCR operation was cancelled by the user.";
             MessageBox.Show("OCR processing was cancelled.", "Operation Cancelled", MessageBoxButtons.OK, MessageBoxIcon.Information);
         }
         catch (Exception ex)
         {
+            _logger.LogError("OCR processing failed", ex);
             StatusMessage = $"OCR Error: {ex.Message}";
             MessageBox.Show($"An error occurred during OCR processing:\n{ex.Message}", "OCR Failed", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
@@ -522,6 +553,7 @@ public class MainViewModel
     {
         if (string.IsNullOrWhiteSpace(ExtractedText))
         {
+            _logger.LogWarning("Copy to clipboard: no text available");
             MessageBox.Show("There is no extracted text to copy.", "Empty Text", MessageBoxButtons.OK, MessageBoxIcon.Information);
             return;
         }
@@ -529,10 +561,12 @@ public class MainViewModel
         try
         {
             System.Windows.Forms.Clipboard.SetText(ExtractedText);
+            _logger.LogInfo("Text copied to clipboard successfully");
             StatusMessage = "Extracted Arabic text copied to clipboard.";
         }
         catch (Exception ex)
         {
+            _logger.LogError("Failed to copy to clipboard", ex);
             MessageBox.Show($"Failed to copy to clipboard: {ex.Message}", "Clipboard Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
     }
@@ -585,12 +619,15 @@ public class MainViewModel
         {
             try
             {
+                _logger.LogInfo($"Saving text to: {OutputFilePath}");
                 await _textExportService.SaveTextAsync(OutputFilePath, ExtractedText);
+                _logger.LogInfo("Text save completed successfully");
                 StatusMessage = $"Text successfully saved to '{OutputFilePath}'.";
                 MessageBox.Show($"Text saved successfully to:\n{OutputFilePath}", "Save Successful", MessageBoxButtons.OK, MessageBoxIcon.Information);
             }
             catch (Exception ex)
             {
+                _logger.LogError("Failed to save text file", ex);
                 MessageBox.Show($"Failed to save text file:\n{ex.Message}", "Save Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }

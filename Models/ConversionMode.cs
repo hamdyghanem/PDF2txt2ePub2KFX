@@ -1,4 +1,4 @@
-namespace ArabicPdfOcrApp.Models;
+namespace NileFusion.Converter.Models;
 
 /// <summary>
 /// Represents the starting format for the conversion workflow

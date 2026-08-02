@@ -1,9 +1,9 @@
 using System.IO;
 using System.Net.Http;
-using ArabicPdfOcrApp.Models;
+using NileFusion.Converter.Models;
 using Tesseract;
 
-namespace ArabicPdfOcrApp.Services;
+namespace NileFusion.Converter.Services;
 
 public class TesseractOcrService : IOcrService
 {

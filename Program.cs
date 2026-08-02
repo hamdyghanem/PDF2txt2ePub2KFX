@@ -1,4 +1,4 @@
-namespace ArabicPdfOcrApp;
+namespace NileFusion.Converter;
 
 static class Program
 {

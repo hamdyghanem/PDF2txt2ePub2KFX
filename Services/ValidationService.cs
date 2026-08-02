@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace ArabicPdfOcrApp.Services;
+namespace NileFusion.Converter.Services;
 
 /// <summary>
 /// Service for file and input validation.

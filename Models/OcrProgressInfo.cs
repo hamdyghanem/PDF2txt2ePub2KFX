@@ -1,4 +1,4 @@
-namespace ArabicPdfOcrApp.Models;
+namespace NileFusion.Converter.Models;
 
 public record OcrProgressInfo(
     int CurrentPage,

@@ -4,7 +4,7 @@ using System.IO;
 using Windows.Data.Pdf;
 using Windows.Storage;
 
-namespace ArabicPdfOcrApp.Services;
+namespace NileFusion.Converter.Services;
 
 public class PdfRenderService : IPdfRenderService
 {

@@ -3,7 +3,7 @@ using System.IO.Compression;
 using System.Text;
 using System.Text.RegularExpressions;
 
-namespace ArabicPdfOcrApp.Services;
+namespace NileFusion.Converter.Services;
 
 public class EpubExportService
 {

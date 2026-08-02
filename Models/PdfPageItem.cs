@@ -1,6 +1,6 @@
 using System.Drawing;
 
-namespace ArabicPdfOcrApp.Models;
+namespace NileFusion.Converter.Models;
 
 public class PdfPageItem
 {

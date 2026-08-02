@@ -1,8 +1,8 @@
-using ArabicPdfOcrApp.Models;
-using ArabicPdfOcrApp.ViewModels;
+using NileFusion.Converter.Models;
+using NileFusion.Converter.ViewModels;
 using System.Windows.Forms;
 
-namespace ArabicPdfOcrApp;
+namespace NileFusion.Converter;
 
 public partial class MainForm : Form
 {
@@ -22,7 +22,7 @@ public partial class MainForm : Form
 
     private void SetupUI()
     {
-        this.Text = "Multi-Format Document Converter (PDF/TXT/EPUB ↔ KFX) - .NET 10";
+        this.Text = "🌊 NileFusion.Converter - Multi-Format Document Converter (PDF/TXT/EPUB ↔ KFX) - .NET 10";
         this.Size = new Size(1350, 850);
         this.MinimumSize = new Size(950, 650);
         this.StartPosition = FormStartPosition.CenterScreen;

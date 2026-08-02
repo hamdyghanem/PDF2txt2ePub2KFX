@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text;
 
-namespace ArabicPdfOcrApp.Services;
+namespace NileFusion.Converter.Services;
 
 public class TextExportService : ITextExportService
 {

@@ -1,6 +1,6 @@
-using ArabicPdfOcrApp.Models;
+using NileFusion.Converter.Models;
 
-namespace ArabicPdfOcrApp.Services;
+namespace NileFusion.Converter.Services;
 
 public static class OcrServiceFactory
 {

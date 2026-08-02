@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace ArabicPdfOcrApp.Services;
+namespace NileFusion.Converter.Services;
 
 /// <summary>
 /// Simple logging service for application diagnostics.

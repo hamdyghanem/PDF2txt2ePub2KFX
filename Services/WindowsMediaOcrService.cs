@@ -5,7 +5,7 @@ using Windows.Graphics.Imaging;
 using Windows.Media.Ocr;
 using Windows.Storage.Streams;
 
-namespace ArabicPdfOcrApp.Services;
+namespace NileFusion.Converter.Services;
 
 public class WindowsMediaOcrService : IOcrService
 {

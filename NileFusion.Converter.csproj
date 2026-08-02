@@ -6,7 +6,9 @@
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
     <UseWindowsForms>true</UseWindowsForms>
-    <StartupObject>ArabicPdfOcrApp.Program</StartupObject>
+    <StartupObject>NileFusion.Converter.Program</StartupObject>
+    <AssemblyName>NileFusion.Converter</AssemblyName>
+    <RootNamespace>NileFusion.Converter</RootNamespace>
   </PropertyGroup>
 
   <ItemGroup>
