@@ -116,41 +116,119 @@ public class KfxExportService
                     "Calibre → Preferences → Plugins → Get new plugins → search 'KFX Output'");
             }
 
-            // Wait for output file to be fully written to disk
-            // Sometimes Calibre returns before the file is completely flushed
-            int maxWaitAttempts = 20;
+            // Wait a moment for any child processes (like Kindle Previewer) to fully start reading/writing
+            await Task.Delay(1000, ct);
+
+            // Wait for output file to exist
+            int maxWaitAttempts = 30;
             while (maxWaitAttempts > 0 && !File.Exists(kfxPath))
             {
                 await Task.Delay(100, ct);
                 maxWaitAttempts--;
             }
 
-            // Give the file more time to be fully released and flushed by Calibre
-            // KFX files can take a moment to be completely written
-            await Task.Delay(2000, ct);
+            if (!File.Exists(kfxPath))
+            {
+                throw new Exception($"KFX output file was not created by Calibre at: {kfxPath}");
+            }
 
-            // Verify the file is a valid ZIP archive (KFX is a ZIP file)
-            // If it's still being written, wait a bit more
-            int validationAttempts = 0;
-            while (validationAttempts < 5)
+            // Wait for file to be fully written - keep waiting while the file size is still changing
+            long previousSize = -1;
+            int stableCount = 0;
+            int maxStableChecks = 10; // Need 10 consecutive stable checks = ~2 seconds
+
+            while (stableCount < maxStableChecks)
             {
                 try
                 {
-                    using (var testStream = File.OpenRead(kfxPath))
-                    using (var testArchive = new System.IO.Compression.ZipArchive(testStream, System.IO.Compression.ZipArchiveMode.Read))
+                    long currentSize = new FileInfo(kfxPath).Length;
+
+                    if (currentSize == previousSize && currentSize > 0)
                     {
-                        // If we can open it as a valid ZIP, we're done
-                        progress?.Report("KFX file validated successfully");
-                        break;
+                        stableCount++;
+                    }
+                    else
+                    {
+                        stableCount = 0;
+                    }
+
+                    previousSize = currentSize;
+
+                    if (stableCount < maxStableChecks)
+                    {
+                        await Task.Delay(200, ct);
                     }
                 }
                 catch
                 {
-                    validationAttempts++;
-                    if (validationAttempts < 5)
+                    // File might be locked, wait and retry
+                    await Task.Delay(200, ct);
+                }
+            }
+
+            // Now try to validate the output KFX file with retries
+            int validationAttempts = 0;
+            int maxValidationAttempts = 10;
+
+            while (validationAttempts < maxValidationAttempts)
+            {
+                try
+                {
+                    var fileInfo = new FileInfo(kfxPath);
+                    if (!fileInfo.Exists || fileInfo.Length == 0)
                     {
-                        await Task.Delay(500, ct);
+                        throw new Exception("KFX file is missing or empty.");
                     }
+
+                    using (var testStream = new FileStream(kfxPath, FileMode.Open, FileAccess.Read, FileShare.ReadWrite))
+                    {
+                        if (testStream.Length == 0)
+                        {
+                            throw new Exception("KFX file is 0 bytes.");
+                        }
+
+                        byte[] header = new byte[8];
+                        int bytesRead = testStream.Read(header, 0, header.Length);
+
+                        bool isZip = bytesRead >= 4 && header[0] == 0x50 && header[1] == 0x4B && header[2] == 0x03 && header[3] == 0x04;
+
+                        if (isZip)
+                        {
+                            testStream.Position = 0;
+                            using (var testArchive = new System.IO.Compression.ZipArchive(testStream, System.IO.Compression.ZipArchiveMode.Read))
+                            {
+                                int entryCount = testArchive.Entries.Count;
+                                if (entryCount > 0)
+                                {
+                                    progress?.Report($"KFX (ZIP container) validated successfully ({entryCount} entries)");
+                                    break;
+                                }
+                                else
+                                {
+                                    throw new Exception("ZIP archive has 0 entries.");
+                                }
+                            }
+                        }
+                        else
+                        {
+                            // Standard KFX binary container format
+                            progress?.Report($"KFX binary container file validated successfully ({fileInfo.Length / 1024.0:F1} KB)");
+                            break;
+                        }
+                    }
+                }
+                catch (Exception ex)
+                {
+                    validationAttempts++;
+                    if (validationAttempts >= maxValidationAttempts)
+                    {
+                        throw new Exception(
+                            $"KFX file validation failed after {maxValidationAttempts} attempts: {ex.Message}\n" +
+                            $"The file may be corrupted or still locked by another process (e.g., Kindle Previewer).\n" +
+                            $"Please close any applications accessing the file and try again.",
+                            ex);
+                    }
+                    await Task.Delay(300, ct);
                 }
             }
 

@@ -223,95 +223,132 @@ public partial class MainForm : Form
     private Panel CreateKfxReviewTab()
     {
         var panel = new Panel { Dock = DockStyle.Fill };
-        var layout = new TableLayoutPanel
+        var mainLayout = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
             RowCount = 4,
             ColumnCount = 1,
-            Padding = new Padding(15)
+            Padding = new Padding(10)
         };
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Title
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Buttons
-        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // File path
-        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // Info display
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Title + buttons
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // File path label
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.Absolute, 160)); // Metadata panel
+        mainLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // Full text reader
 
-        // Title
-        var titleLbl = new Label
-        {
-            Text = "📖 KFX File Review",
-            Font = new Font(DefaultFont.FontFamily, 14, FontStyle.Bold),
-            AutoSize = true,
-            Margin = new Padding(0, 0, 0, 10),
-            Tag = "KfxReviewTitle",
-            Dock = DockStyle.Fill
-        };
-        layout.Controls.Add(titleLbl, 0, 0);
-
-        // Browse button panel
-        var buttonPanel = new FlowLayoutPanel
+        // ── Row 0: Title + Buttons ──────────────────────────────────────────
+        var titleButtonPanel = new FlowLayoutPanel
         {
             FlowDirection = FlowDirection.LeftToRight,
             AutoSize = true,
             WrapContents = false,
-            Margin = new Padding(0, 0, 0, 10),
-            Tag = "KfxButtonPanel",
+            Margin = new Padding(0, 0, 0, 6),
             Dock = DockStyle.Fill
         };
+
+        var titleLbl = new Label
+        {
+            Text = "📖 KFX File Review",
+            Font = new Font(DefaultFont.FontFamily, 13, FontStyle.Bold),
+            AutoSize = true,
+            Tag = "KfxReviewTitle",
+            Margin = new Padding(0, 6, 20, 0)
+        };
+        titleButtonPanel.Controls.Add(titleLbl);
 
         var browseBtn = new Button
         {
             Text = "📂 Open KFX File",
-            Width = 140,
-            Height = 35,
+            Width = 145,
+            Height = 32,
             Font = new Font(DefaultFont, FontStyle.Bold),
             BackColor = Color.LightCyan,
             Tag = "KfxBrowseBtn"
         };
         browseBtn.Click += (s, e) => OpenKfxFile();
-        buttonPanel.Controls.Add(browseBtn);
+        titleButtonPanel.Controls.Add(browseBtn);
 
         var clearBtn = new Button
         {
-            Text = "🗑️  Clear",
-            Width = 100,
-            Height = 35,
+            Text = "🗑️ Clear",
+            Width = 90,
+            Height = 32,
             Font = new Font(DefaultFont, FontStyle.Bold),
             BackColor = Color.LightGray,
-            Margin = new Padding(10, 0, 0, 0),
+            Margin = new Padding(8, 0, 0, 0),
             Tag = "KfxClearBtn"
         };
         clearBtn.Click += (s, e) => ClearKfxReview();
-        buttonPanel.Controls.Add(clearBtn);
+        titleButtonPanel.Controls.Add(clearBtn);
 
-        layout.Controls.Add(buttonPanel, 0, 1);
+        mainLayout.Controls.Add(titleButtonPanel, 0, 0);
 
-        // File path display
+        // ── Row 1: File path label ──────────────────────────────────────────
         var filePathLabel = new Label
         {
             Text = "No file selected",
             AutoSize = true,
-            Margin = new Padding(0, 0, 0, 10),
+            Margin = new Padding(2, 0, 0, 4),
             ForeColor = Color.Gray,
             Tag = "KfxFilePathLabel",
             Dock = DockStyle.Fill
         };
-        layout.Controls.Add(filePathLabel, 0, 2);
+        mainLayout.Controls.Add(filePathLabel, 0, 1);
 
-        // Info TextBox
+        // ── Row 2: Metadata info box ────────────────────────────────────────
         var infoBox = new TextBox
         {
             Dock = DockStyle.Fill,
             Multiline = true,
             ReadOnly = true,
-            ScrollBars = ScrollBars.Both,
-            Font = new Font("Courier New", 9),
-            BackColor = Color.WhiteSmoke,
+            ScrollBars = ScrollBars.Vertical,
+            Font = new Font("Segoe UI", 9f),
+            BackColor = Color.FromArgb(245, 250, 255),
+            BorderStyle = BorderStyle.FixedSingle,
             Tag = "KfxInfoBox",
             Text = "Waiting for KFX file selection..."
         };
-        layout.Controls.Add(infoBox, 0, 3);
+        mainLayout.Controls.Add(infoBox, 0, 2);
 
-        panel.Controls.Add(layout);
+        // ── Row 3: Full text reader (RTL Arabic) ────────────────────────────
+        var textPanel = new Panel { Dock = DockStyle.Fill };
+        var textPanelLayout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            RowCount = 2,
+            ColumnCount = 1
+        };
+        textPanelLayout.RowStyles.Add(new RowStyle(SizeType.AutoSize));
+        textPanelLayout.RowStyles.Add(new RowStyle(SizeType.Percent, 100));
+
+        var textLabel = new Label
+        {
+            Text = "── Extracted Book Text ──",
+            Font = new Font(DefaultFont.FontFamily, 9, FontStyle.Bold),
+            AutoSize = true,
+            ForeColor = Color.DarkSlateGray,
+            Margin = new Padding(0, 6, 0, 2)
+        };
+        textPanelLayout.Controls.Add(textLabel, 0, 0);
+
+        var textBox = new RichTextBox
+        {
+            Dock = DockStyle.Fill,
+            ReadOnly = true,
+            ScrollBars = RichTextBoxScrollBars.Vertical,
+            Font = new Font("Traditional Arabic", 13f),
+            BackColor = Color.FromArgb(255, 252, 245),
+            BorderStyle = BorderStyle.FixedSingle,
+            RightToLeft = RightToLeft.Yes,
+            Tag = "KfxTextBox",
+            Text = "",
+            WordWrap = true,
+            DetectUrls = false
+        };
+        textPanelLayout.Controls.Add(textBox, 0, 1);
+        textPanel.Controls.Add(textPanelLayout);
+        mainLayout.Controls.Add(textPanel, 0, 3);
+
+        panel.Controls.Add(mainLayout);
         return panel;
     }
 
@@ -333,7 +370,7 @@ public partial class MainForm : Form
     {
         try
         {
-            _statusLabel!.Text = "Loading KFX file...";
+            _statusLabel!.Text = "Loading KFX file... (this may take a moment)";
             Application.DoEvents();
 
             var service = new KfxReviewService();
@@ -347,7 +384,7 @@ public partial class MainForm : Form
                 filePathLabel.ForeColor = Color.Black;
             }
 
-            // Update info box
+            // Update metadata info box (top panel)
             var infoBox = FindControlByTag("KfxInfoBox") as TextBox;
             if (infoBox != null)
             {
@@ -356,14 +393,32 @@ public partial class MainForm : Form
                 infoBox.ScrollToCaret();
             }
 
+            // Update full text reader (bottom panel, RTL Arabic)
+            var textBox = FindControlByTag("KfxTextBox") as RichTextBox;
+            if (textBox != null)
+            {
+                if (!string.IsNullOrWhiteSpace(info.ExtractedText))
+                {
+                    textBox.Text = info.ExtractedText;
+                    textBox.SelectionStart = 0;
+                    textBox.ScrollToCaret();
+                }
+                else
+                {
+                    textBox.Text = "No text content could be extracted from this KFX file.\r\n\r\n" +
+                                   "Make sure Calibre is installed with the KFX Output plugin.";
+                }
+            }
+
             // Update status
             if (info.IsValid)
             {
-                _statusLabel.Text = $"✅ KFX file loaded successfully - {info.Contents.Count} items found";
+                string wordInfo = info.WordCount > 0 ? $" | {info.WordCount:N0} words" : "";
+                _statusLabel!.Text = $"✅ KFX file loaded successfully{wordInfo}";
             }
             else
             {
-                _statusLabel.Text = $"⚠️ Could not fully read KFX file: {info.ErrorMessage}";
+                _statusLabel!.Text = $"⚠️ Could not fully read KFX file: {info.ErrorMessage}";
             }
         }
         catch (Exception ex)
@@ -371,9 +426,10 @@ public partial class MainForm : Form
             _statusLabel!.Text = $"❌ Error: {ex.Message}";
             var infoBox = FindControlByTag("KfxInfoBox") as TextBox;
             if (infoBox != null)
-            {
                 infoBox.Text = $"Error reading KFX file:\r\n\r\n{ex}";
-            }
+            var textBox = FindControlByTag("KfxTextBox") as RichTextBox;
+            if (textBox != null)
+                textBox.Text = "";
         }
     }
 
@@ -388,9 +444,11 @@ public partial class MainForm : Form
 
         var infoBox = FindControlByTag("KfxInfoBox") as TextBox;
         if (infoBox != null)
-        {
             infoBox.Text = "Waiting for KFX file selection...";
-        }
+
+        var textBox = FindControlByTag("KfxTextBox") as RichTextBox;
+        if (textBox != null)
+            textBox.Text = "";
 
         _statusLabel!.Text = "KFX Review cleared - Ready to load another file";
     }
