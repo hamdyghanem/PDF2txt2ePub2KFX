@@ -54,8 +54,11 @@ public class KfxExportService
         IProgress<string>? progress = null,
         CancellationToken ct = default)
     {
-        // Step 1 – build a temp EPUB
-        string tempEpub = Path.ChangeExtension(kfxPath, ".tmp.epub");
+        // Step 1 – build a temp EPUB in system temp directory instead of output directory
+        // This prevents file locking issues when Calibre processes the file
+        string tempEpubFileName = $"temp_{Path.GetFileNameWithoutExtension(kfxPath)}_{Guid.NewGuid():N}.epub";
+        string tempEpub = Path.Combine(Path.GetTempPath(), tempEpubFileName);
+
         try
         {
             progress?.Report("Building intermediate EPUB...");
@@ -65,6 +68,8 @@ public class KfxExportService
             // Step 2 – call Calibre's ebook-convert
             progress?.Report("Calling Calibre ebook-convert → KFX (this may take a moment)...");
 
+            // Note: Calibre's KFX Output plugin may launch Kindle Previewer after conversion
+            // This is a Calibre behavior that cannot be suppressed via command-line flags
             string args = $"\"{tempEpub}\" \"{kfxPath}\" " +
                           "--output-profile kindle_pw3 " +
                           "--input-encoding utf-8 " +
@@ -109,6 +114,44 @@ public class KfxExportService
                     $"Output:\n{outputLog}\n\n" +
                     "Make sure the Calibre KFX Output plugin is installed:\n" +
                     "Calibre → Preferences → Plugins → Get new plugins → search 'KFX Output'");
+            }
+
+            // Wait for output file to be fully written to disk
+            // Sometimes Calibre returns before the file is completely flushed
+            int maxWaitAttempts = 20;
+            while (maxWaitAttempts > 0 && !File.Exists(kfxPath))
+            {
+                await Task.Delay(100, ct);
+                maxWaitAttempts--;
+            }
+
+            // Give the file more time to be fully released and flushed by Calibre
+            // KFX files can take a moment to be completely written
+            await Task.Delay(2000, ct);
+
+            // Verify the file is a valid ZIP archive (KFX is a ZIP file)
+            // If it's still being written, wait a bit more
+            int validationAttempts = 0;
+            while (validationAttempts < 5)
+            {
+                try
+                {
+                    using (var testStream = File.OpenRead(kfxPath))
+                    using (var testArchive = new System.IO.Compression.ZipArchive(testStream, System.IO.Compression.ZipArchiveMode.Read))
+                    {
+                        // If we can open it as a valid ZIP, we're done
+                        progress?.Report("KFX file validated successfully");
+                        break;
+                    }
+                }
+                catch
+                {
+                    validationAttempts++;
+                    if (validationAttempts < 5)
+                    {
+                        await Task.Delay(500, ct);
+                    }
+                }
             }
 
             progress?.Report($"KFX saved to: {Path.GetFileName(kfxPath)}");

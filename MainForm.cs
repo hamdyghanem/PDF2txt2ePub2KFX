@@ -1,4 +1,5 @@
 using NileFusion.BookConverter.Models;
+using NileFusion.BookConverter.Services;
 using NileFusion.BookConverter.ViewModels;
 using System.Windows.Forms;
 
@@ -28,25 +29,52 @@ public partial class MainForm : Form
         this.StartPosition = FormStartPosition.CenterScreen;
         this.AllowDrop = true;
 
-        // Create main container with mode selector and content
+        // Create main container with TabControl
         var mainContainer = new TableLayoutPanel
         {
             Dock = DockStyle.Fill,
-            RowCount = 3,
+            RowCount = 2,
             ColumnCount = 1,
             Padding = new Padding(0)
         };
-        mainContainer.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Mode selector
-        mainContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // Content
+        mainContainer.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // Tabs
         mainContainer.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Status bar
 
-        // Mode Selector
-        var modePanel = CreateModeSelector();
-        mainContainer.Controls.Add(modePanel, 0, 0);
+        // Create TabControl
+        var tabControl = new TabControl
+        {
+            Dock = DockStyle.Fill,
+            Tag = "MainTabControl"
+        };
 
-        // Main content area (initially empty, will be populated after mode selection)
+        // Tab 1: Converter
+        var converterTabPage = new TabPage("🔄 Converter");
+        var converterContent = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            RowCount = 2,
+            ColumnCount = 1,
+            Padding = new Padding(0)
+        };
+        converterContent.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Mode selector
+        converterContent.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // Workflow
+
+        var modePanel = CreateModeSelector();
+        converterContent.Controls.Add(modePanel, 0, 0);
+
         _workflowPanel = new Panel { Dock = DockStyle.Fill };
-        mainContainer.Controls.Add(_workflowPanel, 0, 1);
+        converterContent.Controls.Add(_workflowPanel, 0, 1);
+
+        converterTabPage.Controls.Add(converterContent);
+        tabControl.TabPages.Add(converterTabPage);
+
+        // Tab 2: KFX Review
+        var kfxTabPage = new TabPage("📖 KFX Review");
+        var kfxContent = CreateKfxReviewTab();
+        kfxTabPage.Controls.Add(kfxContent);
+        tabControl.TabPages.Add(kfxTabPage);
+
+        mainContainer.Controls.Add(tabControl, 0, 0);
 
         // Status bar
         var statusBar = new StatusStrip();
@@ -57,7 +85,7 @@ public partial class MainForm : Form
             Width = this.ClientSize.Width - 50
         };
         statusBar.Items.Add(_statusLabel);
-        mainContainer.Controls.Add(statusBar, 0, 2);
+        mainContainer.Controls.Add(statusBar, 0, 1);
 
         this.Controls.Add(mainContainer);
 
@@ -192,6 +220,181 @@ public partial class MainForm : Form
         return panel;
     }
 
+    private Panel CreateKfxReviewTab()
+    {
+        var panel = new Panel { Dock = DockStyle.Fill };
+        var layout = new TableLayoutPanel
+        {
+            Dock = DockStyle.Fill,
+            RowCount = 4,
+            ColumnCount = 1,
+            Padding = new Padding(15)
+        };
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Title
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // Buttons
+        layout.RowStyles.Add(new RowStyle(SizeType.AutoSize)); // File path
+        layout.RowStyles.Add(new RowStyle(SizeType.Percent, 100)); // Info display
+
+        // Title
+        var titleLbl = new Label
+        {
+            Text = "📖 KFX File Review",
+            Font = new Font(DefaultFont.FontFamily, 14, FontStyle.Bold),
+            AutoSize = true,
+            Margin = new Padding(0, 0, 0, 10),
+            Tag = "KfxReviewTitle",
+            Dock = DockStyle.Fill
+        };
+        layout.Controls.Add(titleLbl, 0, 0);
+
+        // Browse button panel
+        var buttonPanel = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            AutoSize = true,
+            WrapContents = false,
+            Margin = new Padding(0, 0, 0, 10),
+            Tag = "KfxButtonPanel",
+            Dock = DockStyle.Fill
+        };
+
+        var browseBtn = new Button
+        {
+            Text = "📂 Open KFX File",
+            Width = 140,
+            Height = 35,
+            Font = new Font(DefaultFont, FontStyle.Bold),
+            BackColor = Color.LightCyan,
+            Tag = "KfxBrowseBtn"
+        };
+        browseBtn.Click += (s, e) => OpenKfxFile();
+        buttonPanel.Controls.Add(browseBtn);
+
+        var clearBtn = new Button
+        {
+            Text = "🗑️  Clear",
+            Width = 100,
+            Height = 35,
+            Font = new Font(DefaultFont, FontStyle.Bold),
+            BackColor = Color.LightGray,
+            Margin = new Padding(10, 0, 0, 0),
+            Tag = "KfxClearBtn"
+        };
+        clearBtn.Click += (s, e) => ClearKfxReview();
+        buttonPanel.Controls.Add(clearBtn);
+
+        layout.Controls.Add(buttonPanel, 0, 1);
+
+        // File path display
+        var filePathLabel = new Label
+        {
+            Text = "No file selected",
+            AutoSize = true,
+            Margin = new Padding(0, 0, 0, 10),
+            ForeColor = Color.Gray,
+            Tag = "KfxFilePathLabel",
+            Dock = DockStyle.Fill
+        };
+        layout.Controls.Add(filePathLabel, 0, 2);
+
+        // Info TextBox
+        var infoBox = new TextBox
+        {
+            Dock = DockStyle.Fill,
+            Multiline = true,
+            ReadOnly = true,
+            ScrollBars = ScrollBars.Both,
+            Font = new Font("Courier New", 9),
+            BackColor = Color.WhiteSmoke,
+            Tag = "KfxInfoBox",
+            Text = "Waiting for KFX file selection..."
+        };
+        layout.Controls.Add(infoBox, 0, 3);
+
+        panel.Controls.Add(layout);
+        return panel;
+    }
+
+    private void OpenKfxFile()
+    {
+        var openFileDialog = new OpenFileDialog
+        {
+            Filter = "KFX Files (*.kfx)|*.kfx|All Files (*.*)|*.*",
+            Title = "Select KFX File to Review"
+        };
+
+        if (openFileDialog.ShowDialog() == DialogResult.OK)
+        {
+            ReviewKfxFile(openFileDialog.FileName);
+        }
+    }
+
+    private void ReviewKfxFile(string kfxFilePath)
+    {
+        try
+        {
+            _statusLabel!.Text = "Loading KFX file...";
+            Application.DoEvents();
+
+            var service = new KfxReviewService();
+            var info = service.ExtractKfxInfo(kfxFilePath);
+
+            // Update file path label
+            var filePathLabel = FindControlByTag("KfxFilePathLabel") as Label;
+            if (filePathLabel != null)
+            {
+                filePathLabel.Text = $"📁 {kfxFilePath}";
+                filePathLabel.ForeColor = Color.Black;
+            }
+
+            // Update info box
+            var infoBox = FindControlByTag("KfxInfoBox") as TextBox;
+            if (infoBox != null)
+            {
+                infoBox.Text = service.GetFormattedSummary(info);
+                infoBox.SelectionStart = 0;
+                infoBox.ScrollToCaret();
+            }
+
+            // Update status
+            if (info.IsValid)
+            {
+                _statusLabel.Text = $"✅ KFX file loaded successfully - {info.Contents.Count} items found";
+            }
+            else
+            {
+                _statusLabel.Text = $"⚠️ Could not fully read KFX file: {info.ErrorMessage}";
+            }
+        }
+        catch (Exception ex)
+        {
+            _statusLabel!.Text = $"❌ Error: {ex.Message}";
+            var infoBox = FindControlByTag("KfxInfoBox") as TextBox;
+            if (infoBox != null)
+            {
+                infoBox.Text = $"Error reading KFX file:\r\n\r\n{ex}";
+            }
+        }
+    }
+
+    private void ClearKfxReview()
+    {
+        var filePathLabel = FindControlByTag("KfxFilePathLabel") as Label;
+        if (filePathLabel != null)
+        {
+            filePathLabel.Text = "No file selected";
+            filePathLabel.ForeColor = Color.Gray;
+        }
+
+        var infoBox = FindControlByTag("KfxInfoBox") as TextBox;
+        if (infoBox != null)
+        {
+            infoBox.Text = "Waiting for KFX file selection...";
+        }
+
+        _statusLabel!.Text = "KFX Review cleared - Ready to load another file";
+    }
+
     private void SelectMode(ConversionMode mode, Button modeButton)
     {
         _viewModel.SelectedMode = mode;
@@ -211,7 +414,13 @@ public partial class MainForm : Form
 
         // Initialize workflow
         var baseFileName = mode.ToString().ToLower();
-        _workflow = _viewModel.InitializeWorkflow(mode, baseFileName, Path.GetTempPath());
+
+        // Use source file directory if available, otherwise use temp directory
+        string outputDir = !string.IsNullOrEmpty(_viewModel.SourceFileDirectory) 
+            ? _viewModel.SourceFileDirectory 
+            : Path.GetTempPath();
+
+        _workflow = _viewModel.InitializeWorkflow(mode, baseFileName, outputDir);
 
         // Refresh workflow panel
         _workflowPanel?.Controls.Clear();
@@ -282,35 +491,6 @@ public partial class MainForm : Form
 
             stepsPanel.Controls.Add(stepsLayout);
             layout.Controls.Add(stepsPanel);
-
-            // Next Steps Buttons
-            var nextFormats = _viewModel.GetAvailableNextFormats();
-            if (nextFormats.Count > 0 && !_workflow.IsComplete)
-            {
-                layout.Controls.Add(CreateLabel("Next Steps"));
-                var nextPanel = new FlowLayoutPanel
-                {
-                    Width = panel.Width - 20,
-                    Height = 50,
-                    AutoSize = true,
-                    FlowDirection = FlowDirection.TopDown
-                };
-
-                foreach (var format in nextFormats)
-                {
-                    var addBtn = new Button
-                    {
-                        Text = $"Add {format}",
-                        Width = 100,
-                        Height = 30,
-                        Tag = $"Add{format}Btn"
-                    };
-                    addBtn.Click += (s, e) => AddPipelineStep(format);
-                    nextPanel.Controls.Add(addBtn);
-                }
-
-                layout.Controls.Add(nextPanel);
-            }
         }
 
         // File selection
@@ -400,25 +580,28 @@ public partial class MainForm : Form
         };
         layout.Controls.Add(pagesList);
 
-        // Action buttons
-        var btnPanel = new FlowLayoutPanel
+        // Action buttons - only in PDF mode
+        if (_viewModel.SelectedMode == ConversionMode.Pdf)
         {
-            Width = panel.Width - 20,
-            Height = 45,
-            FlowDirection = FlowDirection.LeftToRight,
-            AutoSize = true,
-            WrapContents = true
-        };
+            var btnPanel = new FlowLayoutPanel
+            {
+                Width = panel.Width - 20,
+                Height = 45,
+                FlowDirection = FlowDirection.LeftToRight,
+                AutoSize = true,
+                WrapContents = true
+            };
 
-        var startBtn = new Button { Text = "Start Process", Width = 100, Height = 30 };
-        startBtn.Click += (s, e) => _viewModel.StartOcrCommand.Execute(null);
-        btnPanel.Controls.Add(startBtn);
+            var startBtn = new Button { Text = "Start Process", Width = 100, Height = 30, Tag = "StartProcessBtn" };
+            startBtn.Click += (s, e) => _viewModel.StartOcrCommand.Execute(null);
+            btnPanel.Controls.Add(startBtn);
 
-        var cancelBtn = new Button { Text = "Cancel", Width = 80, Height = 30 };
-        cancelBtn.Click += (s, e) => _viewModel.CancelOcrCommand.Execute(null);
-        btnPanel.Controls.Add(cancelBtn);
+            var cancelBtn = new Button { Text = "Cancel", Width = 80, Height = 30 };
+            cancelBtn.Click += (s, e) => _viewModel.CancelOcrCommand.Execute(null);
+            btnPanel.Controls.Add(cancelBtn);
 
-        layout.Controls.Add(btnPanel);
+            layout.Controls.Add(btnPanel);
+        }
 
         // Progress
         var progressBar = new ProgressBar

@@ -18,7 +18,47 @@ public class EpubExportService
 
         await Task.Run(() =>
         {
-            if (File.Exists(epubPath)) File.Delete(epubPath);
+            // Delete existing file with improved retry logic
+            if (File.Exists(epubPath))
+            {
+                int retryCount = 0;
+                const int maxRetries = 5;
+                const int delayMs = 200;
+
+                while (retryCount < maxRetries)
+                {
+                    try
+                    {
+                        File.Delete(epubPath);
+                        System.Threading.Thread.Sleep(100);
+                        break; // Successfully deleted
+                    }
+                    catch (IOException) when (retryCount < maxRetries - 1)
+                    {
+                        retryCount++;
+                        System.Threading.Thread.Sleep(delayMs);
+
+                        // On last retry before attribute reset, try setting attributes
+                        if (retryCount == 3)
+                        {
+                            try
+                            {
+                                var fileInfo = new FileInfo(epubPath);
+                                fileInfo.Attributes = FileAttributes.Normal;
+                            }
+                            catch { /* ignore */ }
+                        }
+                    }
+                    catch (IOException ex)
+                    {
+                        // Final attempt failed
+                        throw new InvalidOperationException(
+                            $"Cannot delete existing file: {epubPath}. The file may be locked by another process. " +
+                            $"Please close any applications that might be using this file (like Calibre or e-book readers) and try again.",
+                            ex);
+                    }
+                }
+            }
 
             using var zip = ZipFile.Open(epubPath, ZipArchiveMode.Create);
 
@@ -117,6 +157,7 @@ p.centered {
   <metadata xmlns:dc=""http://purl.org/dc/elements/1.1/"">
     <dc:identifier id=""uid"">{uid}</dc:identifier>
     <dc:title>{EscapeXml(pdfTitle)}</dc:title>
+    <dc:creator>NileFusion.BookConverter</dc:creator>
     <dc:language>ar</dc:language>
     <meta property=""dcterms:modified"">{DateTime.UtcNow:yyyy-MM-ddTHH:mm:ssZ}</meta>
   </metadata>

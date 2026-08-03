@@ -16,6 +16,7 @@ public class MainViewModel
 
     private string _pdfFilePath = string.Empty;
     private string _outputFilePath = string.Empty;
+    private string _sourceFileDirectory = string.Empty;
     private ObservableCollection<PdfPageItem> _pages = new();
     private PdfPageItem? _selectedPage;
     private int _selectedPageIndex;
@@ -62,6 +63,12 @@ public class MainViewModel
     {
         get => _outputFilePath;
         set => _outputFilePath = value;
+    }
+
+    public string SourceFileDirectory
+    {
+        get => _sourceFileDirectory;
+        set => _sourceFileDirectory = value;
     }
 
     public ObservableCollection<PdfPageItem> Pages
@@ -205,6 +212,10 @@ public class MainViewModel
     {
         if (!string.IsNullOrWhiteSpace(value) && File.Exists(value))
         {
+            // Extract source file directory and store it
+            string sourceDirectory = Path.GetDirectoryName(value) ?? string.Empty;
+            SourceFileDirectory = sourceDirectory;
+
             string ext = Path.GetExtension(value).ToLowerInvariant();
             if (ext == ".pdf")
             {
@@ -217,6 +228,12 @@ public class MainViewModel
             else if (ext == ".epub")
             {
                 OutputFilePath = Path.ChangeExtension(value, ".txt");
+            }
+
+            // Update current workflow's output directory if it exists
+            if (CurrentWorkflow != null && !string.IsNullOrEmpty(sourceDirectory))
+            {
+                CurrentWorkflow.OutputDirectory = sourceDirectory;
             }
 
             _ = LoadDocumentAsync(value);
