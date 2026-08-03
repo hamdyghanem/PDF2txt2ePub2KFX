@@ -1,11 +1,11 @@
 using System.Collections.ObjectModel;
 using System.Drawing;
 using System.IO;
-using NileFusion.Converter.Models;
-using NileFusion.Converter.Services;
+using NileFusion.BookConverter.Models;
+using NileFusion.BookConverter.Services;
 using Microsoft.Win32;
 
-namespace NileFusion.Converter.ViewModels;
+namespace NileFusion.BookConverter.ViewModels;
 
 public class MainViewModel
 {

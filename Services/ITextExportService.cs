@@ -1,4 +1,4 @@
-namespace NileFusion.Converter.Services;
+namespace NileFusion.BookConverter.Services;
 
 public interface ITextExportService
 {

@@ -1,6 +1,6 @@
 using System.Drawing;
 
-namespace NileFusion.Converter.Models;
+namespace NileFusion.BookConverter.Models;
 
 public class PdfPageItem
 {

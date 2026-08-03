@@ -1,7 +1,7 @@
 using System.Diagnostics;
 using System.IO;
 
-namespace NileFusion.Converter.Services;
+namespace NileFusion.BookConverter.Services;
 
 public class KfxExportService
 {

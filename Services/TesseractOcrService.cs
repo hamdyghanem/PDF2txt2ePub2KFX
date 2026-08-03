@@ -1,9 +1,9 @@
 using System.IO;
 using System.Net.Http;
-using NileFusion.Converter.Models;
+using NileFusion.BookConverter.Models;
 using Tesseract;
 
-namespace NileFusion.Converter.Services;
+namespace NileFusion.BookConverter.Services;
 
 public class TesseractOcrService : IOcrService
 {

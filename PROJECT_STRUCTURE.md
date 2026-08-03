@@ -3,12 +3,12 @@
 ## Complete File Organization
 
 ```
-ArabicPdfOcrApp/
+NileFusion.BookConverter/
 │
 ├── 📄 Program.cs                          # Application entry point
 ├── 📄 MainForm.cs                         # WinForms UI shell with workflow builder
-├── 📄 ArabicPdfOcrApp.csproj             # Project file (.NET 10)
-├── 📄 ArabicPdfOcrApp.slnx               # Solution file
+├── 📄 NileFusion.BookConverter.csproj             # Project file (.NET 10)
+├── 📄 NileFusion.BookConverter.slnx               # Solution file
 │
 ├── 📁 ViewModels/
 │   └── MainViewModel.cs                   # State management & business logic

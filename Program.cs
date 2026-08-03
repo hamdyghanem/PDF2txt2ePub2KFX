@@ -1,4 +1,4 @@
-namespace NileFusion.Converter;
+namespace NileFusion.BookConverter;
 
 static class Program
 {

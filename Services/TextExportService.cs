@@ -1,7 +1,7 @@
 using System.IO;
 using System.Text;
 
-namespace NileFusion.Converter.Services;
+namespace NileFusion.BookConverter.Services;
 
 public class TextExportService : ITextExportService
 {

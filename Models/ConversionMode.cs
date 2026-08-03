@@ -1,4 +1,4 @@
-namespace NileFusion.Converter.Models;
+namespace NileFusion.BookConverter.Models;
 
 /// <summary>
 /// Represents the starting format for the conversion workflow

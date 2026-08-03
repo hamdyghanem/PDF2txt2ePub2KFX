@@ -5,7 +5,7 @@
 ### Clone & Build
 ```bash
 git clone https://github.com/hamdyghanem/PDF2txt2ePub2KFX.git
-cd ArabicPdfOcrApp
+cd NileFusion.BookConverter
 dotnet build -c Release
 ```
 

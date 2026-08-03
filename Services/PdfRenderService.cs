@@ -4,7 +4,7 @@ using System.IO;
 using Windows.Data.Pdf;
 using Windows.Storage;
 
-namespace NileFusion.Converter.Services;
+namespace NileFusion.BookConverter.Services;
 
 public class PdfRenderService : IPdfRenderService
 {

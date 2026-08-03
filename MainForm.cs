@@ -1,8 +1,8 @@
-using NileFusion.Converter.Models;
-using NileFusion.Converter.ViewModels;
+using NileFusion.BookConverter.Models;
+using NileFusion.BookConverter.ViewModels;
 using System.Windows.Forms;
 
-namespace NileFusion.Converter;
+namespace NileFusion.BookConverter;
 
 public partial class MainForm : Form
 {
@@ -22,7 +22,7 @@ public partial class MainForm : Form
 
     private void SetupUI()
     {
-        this.Text = "🌊 NileFusion.Converter - Multi-Format Document Converter (PDF/TXT/EPUB ↔ KFX) - .NET 10";
+        this.Text = "🌊 NileFusion.BookConverter - Multi-Format Document Converter (PDF/TXT/EPUB ↔ KFX) - .NET 10";
         this.Size = new Size(1350, 850);
         this.MinimumSize = new Size(950, 650);
         this.StartPosition = FormStartPosition.CenterScreen;
@@ -77,7 +77,7 @@ public partial class MainForm : Form
         var panel = new Panel
         {
             Dock = DockStyle.Top,
-            Height = 120,
+            Height = 150,
             BackColor = SystemColors.Control,
             BorderStyle = BorderStyle.FixedSingle
         };
@@ -90,6 +90,46 @@ public partial class MainForm : Form
             AutoSize = true,
             WrapContents = false
         };
+
+        // Header with logo and app name
+        var headerPanel = new FlowLayoutPanel
+        {
+            FlowDirection = FlowDirection.LeftToRight,
+            AutoSize = true,
+            WrapContents = false,
+            Margin = new Padding(0, 0, 0, 10)
+        };
+
+        // Load and display logo
+        try
+        {
+            var logoPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "Assets", "app_icon.png");
+            if (File.Exists(logoPath))
+            {
+                var logoPicture = new PictureBox
+                {
+                    Image = Image.FromFile(logoPath),
+                    Width = 40,
+                    Height = 40,
+                    SizeMode = PictureBoxSizeMode.Zoom,
+                    Margin = new Padding(0, 0, 10, 0)
+                };
+                headerPanel.Controls.Add(logoPicture);
+            }
+        }
+        catch { /* Logo loading failed, continue without it */ }
+
+        // App name
+        var appNameLbl = new Label
+        {
+            Text = "NileFusion.BookConverter",
+            Font = new Font(DefaultFont.FontFamily, 14, FontStyle.Bold),
+            AutoSize = true,
+            Margin = new Padding(0)
+        };
+        headerPanel.Controls.Add(appNameLbl);
+
+        layout.Controls.Add(headerPanel);
 
         var titleLbl = new Label
         {

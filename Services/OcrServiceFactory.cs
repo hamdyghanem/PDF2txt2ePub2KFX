@@ -1,6 +1,6 @@
-using NileFusion.Converter.Models;
+using NileFusion.BookConverter.Models;
 
-namespace NileFusion.Converter.Services;
+namespace NileFusion.BookConverter.Services;
 
 public static class OcrServiceFactory
 {

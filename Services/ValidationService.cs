@@ -1,6 +1,6 @@
 using System.IO;
 
-namespace NileFusion.Converter.Services;
+namespace NileFusion.BookConverter.Services;
 
 /// <summary>
 /// Service for file and input validation.

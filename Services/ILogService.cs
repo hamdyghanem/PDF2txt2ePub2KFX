@@ -1,6 +1,6 @@
 using System.Diagnostics;
 
-namespace NileFusion.Converter.Services;
+namespace NileFusion.BookConverter.Services;
 
 /// <summary>
 /// Simple logging service for application diagnostics.

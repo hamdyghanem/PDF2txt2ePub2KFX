@@ -1,5 +1,5 @@
-# 📚 Advanced Multi-Format Document Converter
-## PDF/TXT/EPUB ↔ Arabic OCR & Kindle KFX
+# 🌊 NileFusion.BookConverter
+## Advanced Multi-Format Document & PDF to Kindle Publication Pipeline
 
 [![Framework](https://img.shields.io/badge/.NET-10.0-512BD4?style=flat&logo=dotnet)](https://dotnet.microsoft.com/)
 [![OCR Engine](https://img.shields.io/badge/Tesseract-5.2-blue?style=flat)](https://github.com/tesseract-ocr/tesseract)
@@ -8,7 +8,7 @@
 [![Platform](https://img.shields.io/badge/Platform-Windows_10%2F11-0078D6?style=flat&logo=windows)](https://microsoft.com/windows)
 [![License](https://img.shields.io/badge/License-MIT-green.svg)](LICENSE)
 
-A powerful, production-ready desktop application built with **C# .NET 10** and **Windows Forms** for flexible document conversion supporting:
+**NileFusion.BookConverter** is a powerful, production-ready desktop application built with **C# .NET 10** and **Windows Forms** for flexible document conversion supporting:
 - **Arabic PDF OCR** → Extract text with layout preservation
 - **Multi-Format Support** → PDF, TXT, EPUB, KFX
 - **Flexible Workflows** → Start from any format, convert to any target
@@ -89,7 +89,7 @@ All exports use the same base filename with different extensions:
 1. **Clone & Build**
 ```bash
 git clone https://github.com/hamdyghanem/PDF2txt2ePub2KFX.git
-cd ArabicPdfOcrApp
+cd NileFusion.BookConverter
 dotnet build -c Release
 ```
 
@@ -150,7 +150,7 @@ For each PDF:
 
 ### Project Structure
 ```
-ArabicPdfOcrApp/
+NileFusion.BookConverter/
 ├── MainForm.cs                    # WinForms UI with mode selector & workflow
 ├── Program.cs                     # Entry point
 │

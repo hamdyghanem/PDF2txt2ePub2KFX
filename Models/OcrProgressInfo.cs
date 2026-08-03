@@ -1,4 +1,4 @@
-namespace NileFusion.Converter.Models;
+namespace NileFusion.BookConverter.Models;
 
 public record OcrProgressInfo(
     int CurrentPage,
